@@ -12,27 +12,22 @@ class OrderController extends Controller
     // إنشاء طلب جديد
     public function store(Request $request)
     {
-        // ✅ التحقق من صحة البيانات
         $validated = $request->validate([
             'items' => 'required|array|min:1',
             'items.*.item_id' => 'required|exists:items,id',
             'items.*.quantity' => 'required|integer|min:1'
         ]);
 
-        // ✅ حساب السعر الإجمالي
         $totalPrice = 0;
-
         foreach ($validated['items'] as $itemData) {
             $item = Item::findOrFail($itemData['item_id']);
             $totalPrice += $item->price * $itemData['quantity'];
         }
 
-        // ✅ إنشاء الطلب
         $order = Order::create([
-            'total_price' => $totalPrice
+            'total_price' => $totalPrice,
         ]);
 
-        // ✅ إضافة العناصر المرتبطة بالطلب
         foreach ($validated['items'] as $itemData) {
             OrderItem::create([
                 'order_id' => $order->id,
@@ -41,15 +36,14 @@ class OrderController extends Controller
             ]);
         }
 
-        // ✅ تحميل الطلب مع العناصر المرتبطة
         return response()->json([
             'status' => 'success',
             'message' => 'تم إنشاء الطلب بنجاح',
-            'data' => $order->load('orderItems.item') // يجلب الأصناف المرتبطة
+            'data' => $order->load('orderItems.item')
         ], 201);
     }
 
-    // عرض كل الطلبات
+    // عرض كل الطلبات مع الأصناف المرتبطة
     public function index()
     {
         $orders = Order::with('orderItems.item')->get();
@@ -58,5 +52,43 @@ class OrderController extends Controller
             'status' => 'success',
             'data' => $orders
         ]);
+    }
+
+    // عرض طلب محدد
+    public function show($id)
+    {
+        $order = Order::with('orderItems.item')->findOrFail($id);
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $order
+        ]);
+    }
+
+    // تحديث حالة الطلب
+    public function updateStatus(Request $request, $id)
+    {
+        $request->validate([
+            'status' => 'required|string|in:pending,preparing,ready,served,cancelled'
+        ]);
+
+        $order = Order::findOrFail($id);
+        $order->status = $request->status;
+        $order->save();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'تم تحديث حالة الطلب',
+            'data' => $order
+        ]);
+    }
+
+    // حذف طلب
+    public function destroy($id)
+    {
+        $order = Order::findOrFail($id);
+        $order->delete();
+
+        return response()->json(null, 204);
     }
 }
