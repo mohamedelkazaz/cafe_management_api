@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\Item;
 use Illuminate\Http\Request;
 
 class OrderController extends Controller
@@ -11,36 +12,51 @@ class OrderController extends Controller
     // إنشاء طلب جديد
     public function store(Request $request)
     {
-        // التحقق من البيانات المدخلة
+        // ✅ التحقق من صحة البيانات
         $validated = $request->validate([
-            'total_price' => 'required|numeric',
-            'items' => 'required|array',
+            'items' => 'required|array|min:1',
             'items.*.item_id' => 'required|exists:items,id',
             'items.*.quantity' => 'required|integer|min:1'
         ]);
 
-        // إنشاء الطلب
+        // ✅ حساب السعر الإجمالي
+        $totalPrice = 0;
+
+        foreach ($validated['items'] as $itemData) {
+            $item = Item::findOrFail($itemData['item_id']);
+            $totalPrice += $item->price * $itemData['quantity'];
+        }
+
+        // ✅ إنشاء الطلب
         $order = Order::create([
-            'total_price' => $validated['total_price']
+            'total_price' => $totalPrice
         ]);
 
-        // إضافة العناصر المرتبطة بالطلب
-        foreach ($validated['items'] as $item) {
+        // ✅ إضافة العناصر المرتبطة بالطلب
+        foreach ($validated['items'] as $itemData) {
             OrderItem::create([
                 'order_id' => $order->id,
-                'item_id' => $item['item_id'],
-                'quantity' => $item['quantity']
+                'item_id' => $itemData['item_id'],
+                'quantity' => $itemData['quantity']
             ]);
         }
 
-        // إعادة الطلب مع العناصر المرتبطة
-        return response()->json($order->load('orderItems'), 201);
+        // ✅ تحميل الطلب مع العناصر المرتبطة
+        return response()->json([
+            'status' => 'success',
+            'message' => 'تم إنشاء الطلب بنجاح',
+            'data' => $order->load('orderItems.item') // يجلب الأصناف المرتبطة
+        ], 201);
     }
 
     // عرض كل الطلبات
     public function index()
     {
-        $orders = Order::with('orderItems')->get();
-        return response()->json($orders);
+        $orders = Order::with('orderItems.item')->get();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $orders
+        ]);
     }
 }

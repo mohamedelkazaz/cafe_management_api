@@ -16,10 +16,33 @@ class ItemController extends Controller
 
     // إضافة عنصر جديد للمنيو
     public function store(Request $request)
-    {
-        $item = Item::create($request->all());
-        return response()->json($item, 201);
+{
+    $request->validate([
+        'name' => 'required|string',
+        'description' => 'nullable|string',
+        'price' => 'required|numeric',
+        'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048'
+    ]);
+
+    $imagePath = null;
+
+    if ($request->hasFile('image')) {
+        $imagePath = $request->file('image')->store('items', 'public');
     }
+
+    $item = Item::create([
+        'name' => $request->name,
+        'description' => $request->description,
+        'price' => $request->price,
+        'image_url' => $imagePath
+    ]);
+
+    return response()->json([
+        'status' => 'success',
+        'message' => 'تم إضافة الصنف بنجاح',
+        'data' => $item
+    ]);
+}
 
     // عرض عنصر محدد
     public function show($id)
