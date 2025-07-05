@@ -24,9 +24,10 @@ class OrderController extends Controller
             $totalPrice += $item->price * $itemData['quantity'];
         }
 
-        $order = Order::create([
-            'total_price' => $totalPrice,
-        ]);
+       $order = Order::create([
+    'total_price' => $totalPrice,
+    'status' => 'pending' 
+  ]);
 
         foreach ($validated['items'] as $itemData) {
             OrderItem::create([
@@ -91,4 +92,104 @@ class OrderController extends Controller
 
         return response()->json(null, 204);
     }
+    // تقرير إجمالي الطلبات والمبيعات
+    public function reportSummary()
+    {
+        $totalOrders = Order::count();
+        $totalSales = Order::sum('total_price');
+        $todayOrders = Order::whereDate('created_at', now()->toDateString())->count();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'total_orders' => $totalOrders,
+                'total_sales' => $totalSales,
+                'today_orders' => $todayOrders,
+            ]
+        ]);
+    }
+    // تقرير الطلبات حسب التاريخ
+public function report(Request $request)
+{
+    $request->validate([
+        'from' => 'required|date',
+        'to' => 'required|date|after_or_equal:from',
+    ]);
+
+    $orders = Order::with('orderItems.item')
+        ->whereBetween('created_at', [$request->from, $request->to])
+        ->get();
+
+    return response()->json([
+        'status' => 'success',
+        'data' => $orders
+    ]);
+}
+public function dashboardStats()
+{
+    $ordersCount = \App\Models\Order::count();
+    $itemsCount = \App\Models\Item::count();
+    $totalRevenue = \App\Models\Order::sum('total_price');
+
+    return response()->json([
+        'orders_count' => $ordersCount,
+        'items_count' => $itemsCount,
+        'total_revenue' => $totalRevenue
+    ]);
+}
+// فلترة الطلبات حسب الحالة
+public function filterByStatus($status)
+{
+    $validStatuses = ['pending', 'preparing', 'ready', 'served', 'cancelled'];
+
+    if (!in_array($status, $validStatuses)) {
+        return response()->json([
+            'status' => 'error',
+            'message' => 'حالة الطلب غير صالحة'
+        ], 400);
+    }
+
+    $orders = Order::with('orderItems.item')
+        ->where('status', $status)
+        ->get();
+
+    return response()->json([
+        'status' => 'success',
+        'data' => $orders
+    ]);
+}
+public function getByStatus($status)
+{
+    $validStatuses = ['pending', 'preparing', 'ready', 'served', 'cancelled'];
+
+    if (!in_array($status, $validStatuses)) {
+        return response()->json(['error' => 'Invalid status'], 400);
+    }
+
+    $orders = Order::with('orderItems.item')
+        ->where('status', $status)
+        ->get();
+
+    return response()->json([
+        'status' => 'success',
+        'data' => $orders
+    ]);
+}
+public function summary()
+{
+    $totalOrders = Order::count();
+    $totalRevenue = Order::sum('total_price');
+    $byStatus = Order::selectRaw('status, COUNT(*) as count')
+                    ->groupBy('status')
+                    ->get();
+
+    return response()->json([
+        'total_orders' => $totalOrders,
+        'total_revenue' => $totalRevenue,
+        'orders_by_status' => $byStatus
+    ]);
+}
+
+
+
 }
