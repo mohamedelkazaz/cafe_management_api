@@ -16,17 +16,18 @@ class Item extends Model
 
 
     protected $fillable = [
-        'name',
-        'description',
-        'price',
-        'image_url',
-    ];
+    'name', 'description', 'price', 'image_url', 'is_visible',
+];
+
 
     public function orderItems()
     {
         return $this->hasMany(OrderItem::class);
     }
-
+    public function getImageUrlAttribute()
+{
+    return $this->image ? asset('storage/' . $this->image) : null;
+}
 
     public function orders()
     {
